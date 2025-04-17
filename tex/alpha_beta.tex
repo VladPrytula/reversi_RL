@@ -1,0 +1,441 @@
+\documentclass[11pt]{article}
+
+%— ensure proper input encoding and better hyphenation/font encoding
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+%— typography improvements
+\usepackage{microtype}
+
+%— geometry early so listings, floats, microtype all know the margins
+\usepackage[a4paper,margin=1in]{geometry}
+
+%— maths, theorem environments
+\usepackage{amsmath,amssymb,amsthm}
+
+%— algorithm floats + pseudocode
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+%— graphics and code‐listings
+\usepackage{graphicx}
+\usepackage{listings}
+
+%— colour (for listings) before hyperref
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+%— theorem styles
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}{Definition}
+\newtheorem{lemma}{Lemma}
+
+%— adapt algorithmicx keywords to “Input” / “Output”
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+
+%— Python listing style
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!40!black},
+    stringstyle=\color{red},
+    showstringspaces=false,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    breaklines=true,
+    frame=single,
+    tabsize=4
+}
+
+\title{Chapter X: Adversarial Search and Alpha-Beta Pruning}
+\author{Your Name Here}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Introduction: Game Playing as Search}
+Many classic board games, such as Chess, Checkers, Go, and Reversi (also known as Othello), can be modeled as problems of search. These are typically two-player, zero-sum games of perfect information. “Perfect information” means that both players know the complete state of the game at all times (no hidden cards or dice rolls influencing the outcome beyond the players’ choices). “Zero-sum” implies that one player’s gain is exactly the other player’s loss; there are no cooperative outcomes.
+
+In such games, players alternate turns, making moves that transition the game from one state to another. The goal is to find a sequence of moves that leads to a winning terminal state. Since the opponent is also trying to win (and thus force the first player into a losing state), this involves reasoning about the opponent’s potential counter-moves. This adversarial nature distinguishes game‑playing search from standard path‑finding search problems.
+
+We can represent the game as a \textit{game tree}, where nodes correspond to game states and edges represent possible moves. The root of the tree is the current game state. The children of a node are the states reachable by making one valid move. Terminal nodes represent the end of the game (win, lose, or draw).
+
+Our objective is to develop an algorithm that can choose the “best” possible move from the current state, assuming the opponent also plays optimally. The foundational algorithm for this is Minimax. However, the size of game trees grows exponentially with the number of moves (the ply or depth), making exhaustive search infeasible for most non-trivial games. Alpha‑Beta pruning is a crucial optimization that significantly reduces the search space without affecting the final outcome determined by Minimax.
+
+In this chapter, we will first explore the Minimax algorithm, then delve into the mechanics and justification of Alpha‑Beta pruning. We will analyze a concrete implementation of an Alpha‑Beta bot for the game of Reversi, discuss the critical role of heuristic evaluation functions, and finally touch upon common extensions to enhance the performance of adversarial search algorithms. Reversi serves as an excellent testbed due to its relatively simple rules but complex strategic depth, making it suitable for illustrating these concepts as we progress towards more advanced techniques later in this book.
+
+\section{The Minimax Algorithm}
+The Minimax algorithm provides a formal way to determine the optimal move in a zero‑sum game, assuming both players play perfectly. It explores the game tree recursively, calculating the utility of each state for the player whose turn it is.
+
+\subsection{Core Concepts}
+\begin{definition}[Game State]
+A representation of the board configuration and whose turn it is.
+\end{definition}
+\begin{definition}[Terminal State]
+A game state where the game has ended (e.g., win, loss, draw).
+\end{definition}
+\begin{definition}[Utility Function]
+A function $U(s)$ that assigns a numerical value to a terminal state $s$. By convention, higher values are better for MAX and lower values better for MIN; in a zero-sum game, $U_{\mathrm{MAX}}(s) = -\,U_{\mathrm{MIN}}(s)$.
+\end{definition}
+\begin{definition}[Moves Function]
+A function $\mathrm{Moves}(s,\mathrm{player})$ that returns the set of valid moves available to \texttt{player} in state $s$.
+\end{definition}
+\begin{definition}[Result Function]
+A function $\mathrm{Result}(s,\mathrm{move})$ that returns the game state resulting from applying \texttt{move} in state $s$.
+\end{definition}
+
+\subsection{The Minimax Value}
+The Minimax value of a state $s$, denoted $\mathrm{Minimax}(s)$, is defined by:
+\[
+  \mathrm{Minimax}(s) =
+  \begin{cases}
+    U(s), 
+      & \text{if $s$ is terminal},\\[6pt]
+    \displaystyle
+    \max_{m\in\mathrm{Moves}(s,\mathrm{MAX})}\mathrm{Minimax}(\mathrm{Result}(s,m)),
+      & \text{if it is MAX’s turn},\\[6pt]
+    \displaystyle
+    \min_{m\in\mathrm{Moves}(s,\mathrm{MIN})}\mathrm{Minimax}(\mathrm{Result}(s,m)),
+      & \text{if it is MIN’s turn}.
+  \end{cases}
+\]
+
+To choose the best move from the current state $s_0$, MAX selects
+\[
+  m^* \;=\;\arg\max_{m\in\mathrm{Moves}(s_0,\mathrm{MAX})}\;
+  \mathrm{Minimax}\bigl(\mathrm{Result}(s_0,m)\bigr).
+\]
+
+\subsection{Algorithm Pseudocode}
+\begin{algorithm}
+\caption{Minimax Search}\label{alg:minimax}
+\begin{algorithmic}[1]
+\Function{Minimax-Decision}{$state$}
+  \State $best\_m \gets
+    \displaystyle\arg\max_{m\in\mathrm{Moves}(state,\mathrm{MAX})}
+      \mathrm{Min\text{-}Value}(\mathrm{Result}(state,m))$
+  \State \Return $best\_m$
+\EndFunction
+
+\Function{Max-Value}{$state$}
+    \If{Terminal-Test($state$)}
+      \Return Utility($state$)
+    \EndIf
+    \State $v\gets -\infty$
+    \For{$m$ in Moves($state$, MAX)}
+      \State $v\gets\max\bigl(v,\mathrm{Min-Value}(\mathrm{Result}(state,m))\bigr)$
+    \EndFor
+    \Return $v$
+\EndFunction
+
+\Function{Min-Value}{$state$}
+    \If{Terminal-Test($state$)}
+      \Return Utility($state$)
+    \EndIf
+    \State $v\gets +\infty$
+    \For{$m$ in Moves($state$, MIN)}
+      \State $v\gets\min\bigl(v,\mathrm{Max-Value}(\mathrm{Result}(state,m))\bigr)$
+    \EndFor
+    \Return $v$
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Limitations: Computational Complexity}
+
+The Minimax algorithm performs a complete depth-first exploration of the game tree down to the terminal states. If the maximum depth of the tree is $d$ and the average number of legal moves from any state (the branching factor) is $b$, the time complexity of Minimax is $O(b^d)$. The space complexity, due to the depth-first nature, is $O(bd)$ if we store states, or potentially less if states can be generated/retracted efficiently.
+
+For games like Reversi (board size 8x8, potentially up to 60 moves deep) or Chess, $b$ and $d$ are large enough that $b^d$ becomes astronomically large, rendering a full Minimax search to terminal states computationally intractable. This necessitates optimizations or approximations.
+
+\section{Alpha-Beta Pruning}
+
+Alpha-Beta pruning is an optimization technique for the Minimax algorithm. It reduces the number of nodes evaluated in the game tree by eliminating branches that cannot possibly influence the final decision. Crucially, Alpha-Beta pruning guarantees to compute the \textit{same} Minimax value as the full Minimax search, but often much faster.
+
+\subsection{The Core Idea: Pruning Useless Branches}
+
+Imagine MAX is evaluating its possible moves. Suppose MAX explores one move $m_1$ and finds that it guarantees a score of at least $V_1$ (because MIN's best response still leads to a state with value $V_1$). Now, MAX starts exploring another move $m_2$. During the exploration of $m_2$, MIN gets to play. If, at some point, MIN finds a response $m_{2,min}$ that leads to a state with value $V_2$, and $V_2 < V_1$, then MAX knows that choosing $m_2$ is already worse than choosing $m_1$. Why? Because MIN will force the outcome to be at most $V_2$ if MAX chooses $m_2$. Since MAX already has an option ($m_1$) that guarantees at least $V_1$ (where $V_1 > V_2$), MAX has no reason to further explore other responses MIN might have after $m_2$. The subtree under $m_2$ can be pruned below the point where $V_2$ was discovered.
+
+Symmetrically, if MIN is evaluating its responses to a move by MAX, and finds one response $m_{min,1}$ leading to a value $V_1$, and then starts exploring another response $m_{min,2}$ under which MAX finds a move leading to value $V_2 > V_1$, MIN knows that MAX will achieve at least $V_2$ if MIN chooses $m_{min,2}$. Since MIN wants to minimize the score and already has an option ($m_{min,1}$) guaranteeing a score of at most $V_1$ (where $V_1 < V_2$), MIN has no reason to explore $m_{min,2}$ further. That branch can be pruned.
+
+\subsection{Alpha and Beta Values}
+
+To implement this pruning, we maintain two values during the search:
+
+\begin{definition}[Alpha ($\alpha$)]
+The best value (highest score) found so far for MAX along the path from the root to the current node. Initially $-\infty$.
+\end{definition}
+
+\begin{definition}[Beta ($\beta$)]
+The best value (lowest score) found so far for MIN along the path from the root to the current node. Initially $+\infty$.
+\end{definition}
+
+The search proceeds recursively, passing $\alpha$ and $\beta$ down the tree.
+
+\begin{itemize}
+    \item \textbf{At a MAX node:} The node tries to increase $\alpha$. If its current value $v$ ever becomes greater than or equal to $\beta$, it means MIN (at an ancestor node) already has a way to achieve a score of $\beta$ or lower. Since MAX is currently exploring a path that guarantees a score of at least $v \ge \beta$, MIN will never allow the game to reach this MAX node by choosing the corresponding move at the ancestor MIN node. Therefore, the remaining children of this MAX node need not be explored. We can prune the search and return the current value $v$. Otherwise, $\alpha$ is updated with $\max(\alpha, v)$.
+    \item \textbf{At a MIN node:} The node tries to decrease $\beta$. If its current value $v$ ever becomes less than or equal to $\alpha$, it means MAX (at an ancestor node) already has a way to achieve a score of $\alpha$ or higher. Since MIN is currently exploring a path that guarantees a score of at most $v \le \alpha$, MAX will never allow the game to reach this MIN node by choosing the corresponding move at the ancestor MAX node. Therefore, the remaining children of this MIN node need not be explored. We can prune the search and return the current value $v$. Otherwise, $\beta$ is updated with $\min(\beta, v)$.
+\end{itemize}
+
+The condition $\alpha \ge \beta$ is the core of the pruning mechanism. When this condition is met, the current subtree search can be terminated.
+
+\subsection{Algorithm Pseudocode}
+
+The Alpha-Beta algorithm modifies the Minimax functions to include $\alpha$ and $\beta$ parameters.
+
+\begin{algorithm}
+\caption{Alpha-Beta Search}
+\label{alg:alphabeta}
+\begin{algorithmic}[1]
+\Function{AlphaBeta-Search}{$state$}
+    \State $v, \text{move} \gets \text{Max-Value}(state, -\infty, +\infty)$
+    \State \Return move \Comment{Return the best move found at the root}
+\EndFunction
+
+\Function{Max-Value}{$state, \alpha, \beta$}
+    \If{Terminal-Test($state$)} \Return Utility($state$), \textbf{null} \EndIf
+    \State $v \gets -\infty$
+    \State $best\_move \gets \textbf{null}$
+    \For{$m$ in Moves($state$, MAX)}
+        \State $v_2, \_ \gets \text{Min-Value}(\text{Result}(state, m), \alpha, \beta)$ \Comment{Ignore move from lower levels}
+        \If{$v_2 > v$}
+            \State $v \gets v_2$
+            \State $best\_move \gets m$
+            \State $\alpha \gets \max(\alpha, v)$
+        \EndIf
+        \If{$v \ge \beta$} \Comment{Beta cutoff}
+            \State \Return $v, best\_move$
+        \EndIf
+    \EndFor
+    \State \Return $v, best\_move$
+\EndFunction
+
+\Function{Min-Value}{$state, \alpha, \beta$}
+    \If{Terminal-Test($state$)} \Return Utility($state$), \textbf{null} \EndIf
+    \State $v \gets +\infty$
+    \State $best\_move \gets \textbf{null}$
+    \For{$m$ in Moves($state$, MIN)}
+        \State $v_2, \_ \gets \text{Max-Value}(\text{Result}(state, m), \alpha, \beta)$ \Comment{Ignore move from lower levels}
+         \If{$v_2 < v$}
+            \State $v \gets v_2$
+            \State $best\_move \gets m$
+            \State $\beta \gets \min(\beta, v)$
+        \EndIf
+        \If{$v \le \alpha$} \Comment{Alpha cutoff}
+            \State \Return $v, best\_move$
+        \EndIf
+    \EndFor
+    \State \Return $v, best\_move$
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Effectiveness of Pruning}
+
+The efficiency of Alpha-Beta pruning heavily depends on the order in which moves are examined.
+
+\begin{itemize}
+    \item \textbf{Best Case:} If the algorithm always explores the best move first (the one that leads to the true Minimax value), Alpha-Beta achieves significant pruning. For a game tree of depth $d$ and branching factor $b$, the number of nodes examined approaches $O(b^{d/2})$. This is effectively doubling the searchable depth compared to plain Minimax for the same computational effort.
+    \item \textbf{Worst Case:} If the algorithm explores moves in the worst possible order (e.g., always exploring the weakest moves first), no pruning occurs, and the complexity remains $O(b^d)$, the same as Minimax.
+    \item \textbf{Average Case:} In practice, with reasonably good move ordering heuristics, Alpha-Beta often performs much closer to the best case than the worst case.
+\end{itemize}
+
+This highlights the importance of \textit{move ordering} heuristics, which we will discuss later.
+
+\section{Implementation in Reversi: The AlphaBetaBot}
+
+\begin{lstlisting}[style=pythonstyle]
+"""
+Alpha-Beta pruning bot for Reversi.
+"""
+import math
+
+# Assuming 'bots.base.Bot' and 'game.opponent' are defined in the repository
+# E.g., Bot is an abstract class with a 'move' method
+# game contains the Reversi game logic (apply_move, get_valid_moves, etc.)
+# opponent(color) returns the other player's color
+
+class AlphaBetaBot(Bot):
+    """Bot that uses alpha-beta pruning to choose moves."""
+    def __init__(self, max_depth=3):
+        self.max_depth = max_depth # Depth limit for the search
+
+    def move(self, game, color):
+        """Compute best move using alpha-beta search."""
+
+        # Heuristic Evaluation Function (H): Estimates state value
+        def evaluate(g):
+            score = g.get_score() # e.g., {'BLACK': 30, 'WHITE': 34}
+            # Simple heuristic: difference in piece count
+            return score[color] - score[opponent(color)]
+
+        # The core recursive Alpha-Beta function
+        def ab_search(g, depth, maximizing_color, current_color, alpha, beta):
+            # --- Base Cases ---
+            # 1. Depth limit reached
+            # 2. Game is over
+            if depth == 0 or g.is_game_over():
+                return evaluate(g), None # Return heuristic value, no move needed here
+
+            moves = g.get_valid_moves(current_color)
+
+            # --- Handling Pass Turn ---
+            if not moves:
+                g2 = g.clone()
+                g2.current_player = opponent(current_color)
+                if not g2.get_valid_moves(opponent(current_color)):
+                    return evaluate(g2), None
+                return ab_search(g2, depth - 1, maximizing_color, opponent(current_color), alpha, beta)[0], None
+
+            best_move = None
+
+            # --- MAX Player Logic ---
+            if current_color == maximizing_color:
+                value = -math.inf
+                for move in moves:
+                    g2 = g.clone()
+                    g2.apply_move(current_color, move[0], move[1])
+                    score, _ = ab_search(g2, depth - 1, maximizing_color, opponent(current_color), alpha, beta)
+
+                    if score > value:
+                        value = score
+                        best_move = move
+                    alpha = max(alpha, value)
+                    if alpha >= beta:
+                        break
+                return value, best_move
+
+            # --- MIN Player Logic ---
+            else:
+                value = math.inf
+                for move in moves:
+                    g2 = g.clone()
+                    g2.apply_move(current_color, move[0], move[1])
+                    score, _ = ab_search(g2, depth - 1, maximizing_color, opponent(current_color), alpha, beta)
+
+                    if score < value:
+                        value = score
+                        best_move = move
+                    beta = min(beta, value)
+                    if beta <= alpha:
+                        break
+                return value, best_move
+
+        _, move = ab_search(game.clone(), self.max_depth, color, color, -math.inf, math.inf)
+        return move
+\end{lstlisting}
+
+
+\subsection{Analysis of the Implementation}
+
+\begin{enumerate}
+    \item \textbf{Class Structure:} The \texttt{AlphaBetaBot} class inherits from a base \texttt{Bot} class and takes \texttt{max\_depth} as a parameter during initialization. This parameter controls how many moves ahead the bot searches.
+
+    \item \textbf{\texttt{move} Method:} This is the public interface of the bot. It clones the game state using \texttt{game.clone()} to avoid modifying the original game object passed to it. It then calls the internal \texttt{ab\_search} function.
+
+    \item \textbf{\texttt{evaluate} Function (Heuristic):} This function is crucial because the search is depth-limited. When the maximum depth is reached (\texttt{depth == 0}) or the game ends, \texttt{ab\_search} cannot recurse further. Instead, it calls \texttt{evaluate} to estimate the utility of the resulting game state for the \texttt{maximizing\_color}. The provided implementation uses a simple heuristic: the difference between the number of pieces owned by the bot and by the opponent. This is often referred to as the "piece count" or "material" heuristic. While simple, it is typically a poor indicator of position strength in Reversi, especially during the mid-game. Better heuristics are discussed later.
+
+    \item \textbf{\texttt{ab\_search} Function:} This is the core of the algorithm, implementing recursive Alpha-Beta logic:
+    \begin{itemize}
+        \item \textbf{Parameters:} 
+        \begin{description}
+		  \item[\texttt{g}] Current game state.
+		  \item[\texttt{depth}] Remaining search depth.
+		  \item[\texttt{maximizing\_color}] The bot's own color, fixed throughout the search.
+		  \item[\texttt{current\_color}] Whose turn it is at this node.
+		  \item[\texttt{alpha}] Best score found so far for MAX.
+		  \item[\texttt{beta}] Best score found so far for MIN.
+	\end{description}
+        \item \textbf{Base Cases:} Checks whether the depth limit is reached or the game is over. If so, it returns the heuristic evaluation.
+        \item \textbf{Move Generation:} Retrieves the valid moves for the \texttt{current\_color}.
+        \item \textbf{Handling Passes:} If no valid moves are available, the function simulates a pass by cloning the game, switching \texttt{current\_player}, and making a recursive call to the opponent with \texttt{depth - 1}. It also handles the case where both players must pass (indicating the end of the game).
+        \item \textbf{MAX Node Logic (\texttt{current\_color == maximizing\_color}):} Initializes \texttt{value} to $-\infty$. For each move, it clones the game, applies the move, recursively calls \texttt{ab\_search} for the MIN player, and updates \texttt{value} and \texttt{best\_move} if a better score is found. It updates \texttt{alpha} and performs a beta cutoff if \texttt{alpha >= beta}.
+        \item \textbf{MIN Node Logic (\texttt{else} case):} Symmetrical to the MAX case. Initializes \texttt{value} to $+\infty$, applies each move to a clone, recursively calls \texttt{ab\_search} for the MAX player, updates \texttt{value} and \texttt{best\_move} if a lower score is found, updates \texttt{beta}, and performs an alpha cutoff if \texttt{beta <= alpha}.
+        \item \textbf{Return Value:} The function returns a tuple of the computed score (\texttt{value}) and the best move (\texttt{best\_move}) found at that node. Only the best move is used by the top-level \texttt{move} method.
+    \end{itemize}
+
+    \item \textbf{State Cloning:} Using \texttt{g.clone()} is essential. Each recursive call explores a hypothetical future. Modifying the original game state directly would interfere with sibling branches in the search tree. Cloning ensures that each branch explores an independent copy of the game.
+\end{enumerate}
+
+This implementation correctly captures the essence of depth-limited Alpha-Beta search with a pluggable evaluation function.
+
+\section{Heuristic Evaluation Functions for Reversi}
+
+As seen in the implementation, when the search cannot reach a terminal state (due to the depth limit), we need a way to estimate the value of non-terminal states. This is the role of the \textit{heuristic evaluation function}. The quality of this function is paramount to the strength of the game-playing bot.
+
+The simple piece difference heuristic (\texttt{score[color] - score[opponent(color)]}) used in the example code is often insufficient for strong Reversi play. Good heuristics should be:
+\begin{enumerate}
+    \item \textbf{Fast to compute:} It is called at every leaf node of the search.
+    \item \textbf{Strongly correlated with win probability:} It should accurately reflect the long-term potential of the position.
+\end{enumerate}
+
+Here are some common heuristic components used in Reversi bots, often combined using weights:
+
+\begin{enumerate}
+    \item \textbf{Piece Count / Material:} The difference in the number of pieces. More useful towards the very end of the game, less so early on.
+    \item \textbf{Mobility:} The number of valid moves available to a player. Having more options (higher mobility) is generally advantageous as it restricts the opponent. Often calculated as:
+    \[ H_{\text{mobility}} = |\text{Moves}(s, \text{MAX})| - |\text{Moves}(s, \text{MIN})| \]
+    \item \textbf{Corner Occupancy:} Corners (a1, a8, h1, h8) are strategically vital because they are stable (cannot be flipped once occupied).
+    \[ H_{\text{corners}} = (\# \text{corners MAX}) - (\# \text{corners MIN}) \]
+    \item \textbf{Edge Stability:} Pieces on edges can be stable or unstable. Stable edge pieces (e.g., next to an occupied corner) contribute to securing territory.
+    \item \textbf{Potential Mobility:} The number of empty squares adjacent to opponent pieces, representing potential future moves. Controlling this can be important for setting up future captures.
+    \item \textbf{Weighted Piece Squares (Positional Strategy):} Assigns static weights to each square. For instance, corners have high positive weights, adjacent squares (e.g., a2, b1, b2) may be negatively weighted, and central squares receive moderate weight. The heuristic is computed as:
+    \[ H_{\text{positional}} = \sum_{i \in \text{Squares}_{\text{MAX}}} W(i) - \sum_{j \in \text{Squares}_{\text{MIN}}} W(j) \]
+    where $W(k)$ is the weight of square $k$.
+\end{enumerate}
+
+A common approach is to use a weighted sum of several such features:
+\[ H(s) = w_1 H_{\text{material}}(s) + w_2 H_{\text{mobility}}(s) + w_3 H_{\text{corners}}(s) + \dots \]
+The weights $w_i$ might vary depending on the stage of the game (e.g., mobility is more important early, while piece count matters more late). These weights are often chosen based on expert knowledge or learned using machine learning.
+
+Replacing the simple \texttt{evaluate} function in \texttt{AlphaBetaBot} with a more sophisticated heuristic incorporating features like mobility and corner control would significantly improve its playing strength.
+
+\section{Extensions and Improvements}
+
+The basic Alpha-Beta algorithm with a fixed depth limit and a simple heuristic can be significantly enhanced. Here are some common extensions:
+
+\begin{enumerate}
+    \item \textbf{Iterative Deepening Search (IDS):} Instead of choosing a fixed depth \texttt{d}, IDS starts by searching to depth 1, then depth 2, and so on, until a time or resource limit is reached.
+    \begin{itemize}
+        \item \textbf{Anytime Algorithm:} Returns a valid move even if interrupted early.
+        \item \textbf{Improved Move Ordering:} The best move at depth $k$ often guides move ordering at depth $k+1$, improving Alpha-Beta pruning efficiency and approaching the $O(b^{d/2})$ best case.
+    \end{itemize}
+
+    \item \textbf{Enhanced Move Ordering:} Efficient pruning depends on evaluating strong moves early. Enhancements include:
+    \begin{itemize}
+        \item \textbf{Heuristic Move Ordering:} Use fast heuristics to prioritize promising moves (e.g., capturing corners).
+        \item \textbf{Killer Moves:} Track moves that previously caused cutoffs and try them first in sibling nodes.
+        \item \textbf{History Heuristic:} Track moves that often yield good outcomes and prioritize them globally.
+    \end{itemize}
+
+    \item \textbf{Quiescence Search:} Addresses the "horizon effect" by extending the search at unstable positions (e.g., pending captures) beyond the depth limit until a stable ("quiet") state is reached. This improves evaluation accuracy.
+
+    \item \textbf{Transposition Tables (Memoization):} Game states can recur via different move sequences (transpositions). Storing their evaluations in a hash table allows reuse and pruning. Typically, keys are Zobrist hashes of game states, and stored values include the computed Minimax value, best move, and search depth.
+\end{enumerate}
+
+\section{Conclusion}
+
+The Minimax algorithm is the foundation for optimal play in two-player, zero-sum, perfect-information games. Alpha-Beta pruning significantly optimizes Minimax by discarding branches that do not influence the decision. Its practical effectiveness relies on good heuristics and move ordering.
+
+The provided \texttt{AlphaBetaBot} demonstrates a depth-limited Alpha-Beta search for Reversi, incorporating alpha-beta bounds, recursive evaluation, and a simple heuristic.
+
+Enhancements like iterative deepening, stronger heuristics, better move ordering, quiescence search, and transposition tables can substantially increase playing strength.
+
+While Alpha-Beta remains central in classical AI for games, modern approaches—especially for vast or imperfect-information games—often use Monte Carlo Tree Search (MCTS) and Deep Reinforcement Learning. Understanding Alpha-Beta provides essential groundwork for these more advanced strategies.
+
+\section{Exercises}
+
+\begin{enumerate}
+    \item Trace the execution of the Alpha-Beta algorithm  on a small sample tree (e.g., depth 3, branching factor 2) with assigned terminal utilities. Show $\alpha$ and $\beta$ values at each node and mark pruned branches.
+
+    \item Implement an alternative heuristic for \texttt{AlphaBetaBot}, e.g., combining piece count with mobility. Let bots using different heuristics play against each other and compare performance.
+
+    \item Modify \texttt{AlphaBetaBot} to incorporate Iterative Deepening. The \texttt{move} method should run increasing-depth searches (1, 2, 3, ...) within a time limit and return the best move from the deepest completed search. Analyze the impact on performance.
+
+    \item Explain why \texttt{g.clone()} is essential in \texttt{ab\_search}. What problems arise if \texttt{g.apply\_move} is used directly on the original game state?
+
+    \item Research Zobrist hashing and explain how it enables efficient implementation of a transposition table. What should be stored in each table entry?
+\end{enumerate}
+\end{document}

@@ -7,7 +7,7 @@ We will be working through various algorithms starting with very basic ones and 
 
 Currently the ones that are implmented are:
 1. Random bot :) (yes, that one). For this one there is no separate section explainin the algorithm since it just moves randomly on the allowed spot
-1. Alpha-Beta (the one and the only) - detailed writing can be found in alpha-beta.md 
+1. Alpha-Beta (the one and the only) - detailed writing can be found in [tex/alpa_beta.pdf](tex/alpa_beta.pdf)
 
 ## 2. Architecture and Module Organization
 ```

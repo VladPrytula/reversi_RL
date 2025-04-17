@@ -7,4 +7,9 @@ __pycache__/
 *.log
 *.egg-info/
 .vscode/
+# Ignore IDE settings
 .idea/
+# LaTeX intermediate files: ignore everything in tex except .tex and .pdf
+/tex/*
+!/tex/*.tex
+!/tex/*.pdf
