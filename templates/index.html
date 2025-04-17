@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Reversi - Create Game</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <h1>Reversi</h1>
+  <p>Select game mode:</p>
+  <form action="/create" method="post">
+    <button type="submit" name="mode" value="pvp">Player vs Player</button>
+    <button type="submit" name="mode" value="pvb_random">Player vs Random Bot</button>
+    <button type="submit" name="mode" value="pvb_ab">Player vs AlphaBeta Bot</button>
+    <button type="submit" name="mode" value="bvb">Random Bot vs AlphaBeta Bot</button>
+  </form>
+</body>
+</html>

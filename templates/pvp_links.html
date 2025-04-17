@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Reversi - Share Game Links</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <h1>Reversi - Player vs Player</h1>
+  <p>Share these links with the players:</p>
+  <ul>
+    <li>Black: <a href="{{ url_for('game', game_id=game_id, color='B') }}">{{ url_for('game', game_id=game_id, color='B') }}</a></li>
+    <li>White: <a href="{{ url_for('game', game_id=game_id, color='W') }}">{{ url_for('game', game_id=game_id, color='W') }}</a></li>
+  </ul>
+</body>
+</html>

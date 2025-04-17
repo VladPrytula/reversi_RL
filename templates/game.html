@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Reversi Game {{ game_id }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <h1>Reversi</h1>
+  <p>Game ID: {{ game_id }}</p>
+  {% if color %}
+    <p>You are: {{ color }}</p>
+  {% else %}
+    <p>Observer mode</p>
+  {% endif %}
+  <p>Current turn: <span id="current-player"></span></p>
+  <p>Score: B: <span id="score-b"></span> W: <span id="score-w"></span></p>
+  <table id="board">
+    {% for r in range(8) %}
+    <tr>
+      {% for c in range(8) %}
+      <td id="cell-{{r}}-{{c}}" class="cell"></td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+  <div id="message"></div>
+  {% if color %}
+    <button id="end-btn">End Game</button>
+  {% endif %}
+  <script>
+    const GAME_ID = "{{ game_id }}";
+    const PLAYER_COLOR = "{{ color if color else '' }}";
+  </script>
+  <script src="{{ url_for('static', filename='js/game.js') }}"></script>
+</body>
+</html>
