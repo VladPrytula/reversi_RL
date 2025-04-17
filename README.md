@@ -1,7 +1,13 @@
-# Reversi (Othello) Web Application
+# Reversi (Othello) - from random bot to Deep Reinforcement Learning
 
 ## 1. Introduction
 This project implements the classic two-player game Reversi (also known as Othello) as a web application using Flask. It supports human-vs-human (PvP), human-vs-bot (PvB) with two bot strategies (Random and Alpha-Beta), and bot-vs-bot (BvB) modes. The codebase is structured to separate board representation, rule verification, game state management, and bot algorithms into modular components for clarity, maintainability, and extensibility.
+
+We will be working through various algorithms starting with very basic ones and moving towards DeepRL.
+
+Currently the ones that are implmented are:
+1. Random bot :) (yes, that one). For this one there is no separate section explainin the algorithm since it just moves randomly on the allowed spot
+1. Alpha-Beta (the one and the only) - detailed writing can be found in alpha-beta.md 
 
 ## 2. Architecture and Module Organization
 ```
